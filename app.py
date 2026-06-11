@@ -1,5 +1,5 @@
 from flask import Flask, request, render_template_string
-import requests
+from playwright.sync_api import sync_playwright
 import re
 import os
 
@@ -8,19 +8,30 @@ app = Flask(__name__)
 URL = "https://www.tgju.org/profile/geram18"
 
 
-# ---------------- گرفتن قیمت ----------------
+# ---------------- گرفتن قیمت با Playwright ----------------
 def get_price():
     try:
-        url = "https://call5.tgju.org/ajax.json?rev=2&items=geram18"
-        r = requests.get(url, timeout=10)
-        data = r.json()
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
 
-        price = data["items"]["geram18"]["p"]
+            page.goto(URL, wait_until="networkidle")
+            page.wait_for_timeout(4000)
 
-        return int(price)
+            text = page.locator("body").inner_text()
+
+            browser.close()
+
+        m = re.search(r"نرخ فعلی[:\s]*([\d,]+)", text)
+
+        if m:
+            return int(m.group(1).replace(",", ""))
 
     except:
         return None
+
+    return None
+
 
 # ---------------- UI ----------------
 HTML = """
@@ -41,8 +52,8 @@ HTML = """
 <form method="post" action="/calc">
 
     <input name="A" placeholder="اجرت %" style="padding:10px;width:200px;"><br><br>
-    <input name="S" placeholder="سود % (پیشفرض 7)" style="padding:10px;width:200px;"><br><br>
-    <input name="T" placeholder="مالیات % (پیشفرض 10)" style="padding:10px;width:200px;"><br><br>
+    <input name="S" placeholder="سود % (7)" style="padding:10px;width:200px;"><br><br>
+    <input name="T" placeholder="مالیات % (10)" style="padding:10px;width:200px;"><br><br>
     <input name="W" placeholder="وزن (گرم)" style="padding:10px;width:200px;"><br><br>
 
     <button style="padding:10px 20px;">محاسبه</button>
@@ -54,24 +65,18 @@ HTML = """
 """
 
 
-# ---------------- صفحه اصلی ----------------
 @app.route("/")
 def home():
     price = get_price()
-
-    if price is None:
-        price = "نامشخص"
-
-    return render_template_string(HTML, price=price)
+    return render_template_string(HTML, price=price if price else "در حال دریافت...")
 
 
-# ---------------- محاسبه ----------------
 @app.route("/calc", methods=["POST"])
 def calc():
-
     price = get_price()
-    if price is None:
-        return "قیمت در دسترس نیست"
+
+    if not price:
+        return "قیمت در دسترس نیست (Playwright failed)"
 
     A = float(request.form.get("A") or 0)
     S = float(request.form.get("S") or 7)
@@ -93,7 +98,7 @@ def calc():
     """
 
 
-# ---------------- مهم برای Render ----------------
+# ---------------- Render fix ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
