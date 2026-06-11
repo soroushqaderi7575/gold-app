@@ -1,5 +1,5 @@
 from flask import Flask, request, render_template_string
-import requests
+from playwright.sync_api import sync_playwright
 import re
 import os
 
@@ -8,27 +8,34 @@ app = Flask(__name__)
 URL = "https://www.tgju.org/profile/geram18"
 
 
+# ---------------- گرفتن قیمت ----------------
 def get_price():
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
 
-            page.goto("https://www.tgju.org/profile/geram18", wait_until="networkidle")
+            page.goto(URL, wait_until="domcontentloaded")
 
-            # صبر برای لود کامل صفحه
             page.wait_for_timeout(5000)
 
-            # گرفتن قیمت از selector واقعی
-            price_text = page.locator("span.value").first.inner_text()
+            html = page.content()
 
             browser.close()
 
-            return int(price_text.replace(",", ""))
+        # گرفتن اولین عدد بزرگ (قیمت)
+        match = re.search(r"([\d,]{6,})", html)
+
+        if match:
+            return int(match.group(1).replace(",", ""))
+
+        return None
 
     except:
         return None
 
+
+# ---------------- UI ----------------
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -47,8 +54,8 @@ HTML = """
 <form method="post" action="/calc">
 
     <input name="A" placeholder="اجرت %" style="padding:10px;width:200px;"><br><br>
-    <input name="S" placeholder="سود % (7)" style="padding:10px;width:200px;"><br><br>
-    <input name="T" placeholder="مالیات % (10)" style="padding:10px;width:200px;"><br><br>
+    <input name="S" placeholder="سود % (پیشفرض 7)" style="padding:10px;width:200px;"><br><br>
+    <input name="T" placeholder="مالیات % (پیشفرض 10)" style="padding:10px;width:200px;"><br><br>
     <input name="W" placeholder="وزن (گرم)" style="padding:10px;width:200px;"><br><br>
 
     <button style="padding:10px 20px;">محاسبه</button>
@@ -60,12 +67,14 @@ HTML = """
 """
 
 
+# ---------------- صفحه اصلی ----------------
 @app.route("/")
 def home():
     price = get_price()
-    return render_template_string(HTML, price=price if price else "نامشخص")
+    return render_template_string(HTML, price=price if price else "قیمت در دسترس نیست")
 
 
+# ---------------- محاسبه ----------------
 @app.route("/calc", methods=["POST"])
 def calc():
     price = get_price()
@@ -93,6 +102,7 @@ def calc():
     """
 
 
+# ---------------- Render ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
