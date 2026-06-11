@@ -10,18 +10,24 @@ URL = "https://www.tgju.org/profile/geram18"
 
 def get_price():
     try:
-        r = requests.get(URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        html = r.text
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
 
-        m = re.search(r"نرخ فعلی[:\s]*([\d,]+)", html)
+            page.goto("https://www.tgju.org/profile/geram18", wait_until="networkidle")
 
-        if m:
-            return int(m.group(1).replace(",", ""))
+            # صبر برای لود کامل صفحه
+            page.wait_for_timeout(5000)
+
+            # گرفتن قیمت از selector واقعی
+            price_text = page.locator("span.value").first.inner_text()
+
+            browser.close()
+
+            return int(price_text.replace(",", ""))
+
     except:
         return None
-
-    return None
-
 
 HTML = """
 <!DOCTYPE html>
