@@ -11,13 +11,13 @@ URL = "https://www.tgju.org/profile/geram18"
 # ---------------- گرفتن قیمت ----------------
 def get_price():
     try:
-        r = requests.get(URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        html = r.text
+        url = "https://call5.tgju.org/ajax.json?rev=2&items=geram18"
+        r = requests.get(url, timeout=10)
+        data = r.json()
 
-        m = re.search(r"نرخ فعلی[:\s]*([\d,]+)", html)
+        price = data["items"]["geram18"]["p"]
 
-        if m:
-            return int(m.group(1).replace(",", ""))
+        return int(price)
 
     except:
         return None
