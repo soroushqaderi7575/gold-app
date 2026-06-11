@@ -1,48 +1,55 @@
-from flask import Flask, render_template_string
+from flask import Flask, request, render_template_string
 import requests
 import re
+import os
 
 app = Flask(__name__)
 
 URL = "https://www.tgju.org/profile/geram18"
 
 
+# ---------------- گرفتن قیمت ----------------
 def get_price():
     try:
-        r = requests.get(URL, headers={"User-Agent": "Mozilla/5.0"})
+        r = requests.get(URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         html = r.text
 
         m = re.search(r"نرخ فعلی[:\s]*([\d,]+)", html)
 
         if m:
-            return m.group(1)
+            return int(m.group(1).replace(",", ""))
 
     except:
-        pass
+        return None
 
-    return "نامشخص"
+    return None
 
 
+# ---------------- UI ----------------
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>Gold App</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gold App</title>
 </head>
-<body style="font-family:tahoma;text-align:center;margin-top:50px;">
 
-<h2>قیمت طلای ۱۸ عیار</h2>
+<body style="font-family:tahoma;text-align:center;margin-top:40px;">
+
+<h2>💰 قیمت طلای ۱۸ عیار</h2>
 
 <h1>{{price}}</h1>
 
 <form method="post" action="/calc">
-    اجرت %: <input name="A"><br><br>
-    سود % (7 پیشفرض): <input name="S"><br><br>
-    مالیات % (10 پیشفرض): <input name="T"><br><br>
-    وزن (گرم): <input name="W"><br><br>
 
-    <button type="submit">محاسبه</button>
+    <input name="A" placeholder="اجرت %" style="padding:10px;width:200px;"><br><br>
+    <input name="S" placeholder="سود % (پیشفرض 7)" style="padding:10px;width:200px;"><br><br>
+    <input name="T" placeholder="مالیات % (پیشفرض 10)" style="padding:10px;width:200px;"><br><br>
+    <input name="W" placeholder="وزن (گرم)" style="padding:10px;width:200px;"><br><br>
+
+    <button style="padding:10px 20px;">محاسبه</button>
+
 </form>
 
 </body>
@@ -50,17 +57,24 @@ HTML = """
 """
 
 
+# ---------------- صفحه اصلی ----------------
 @app.route("/")
 def home():
     price = get_price()
+
+    if price is None:
+        price = "نامشخص"
+
     return render_template_string(HTML, price=price)
 
 
+# ---------------- محاسبه ----------------
 @app.route("/calc", methods=["POST"])
 def calc():
-    from flask import request
 
-    price = int(get_price().replace(",", ""))
+    price = get_price()
+    if price is None:
+        return "قیمت در دسترس نیست"
 
     A = float(request.form.get("A") or 0)
     S = float(request.form.get("S") or 7)
@@ -76,11 +90,13 @@ def calc():
 
     return f"""
     <h2>نتیجه</h2>
-    <p>هر گرم: {int(per_gram)}</p>
-    <p>کل: {int(total)}</p>
+    <p>قیمت هر گرم: {int(per_gram)}</p>
+    <p>قیمت کل: {int(total)}</p>
     <br><a href="/">برگشت</a>
     """
 
 
+# ---------------- مهم برای Render ----------------
 if __name__ == "__main__":
-    app.run()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
