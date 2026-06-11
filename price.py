@@ -13,17 +13,20 @@ def fetch_price():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        page.goto(url)
-        page.wait_for_timeout(5000)
+        page.goto("https://www.tgju.org/profile/geram18")
 
-        text = page.locator("body").inner_text()
+        page.wait_for_timeout(7000)
+
+        # مستقیم از DOM value (نه متن)
+        elements = page.locator("span").all_inner_texts()
 
         browser.close()
 
-    m = re.search(r"نرخ فعلی[:\s]*([\d,]+)", text)
-
-    if m:
-        return int(m.group(1).replace(",", ""))
+    # پیدا کردن عدد واقعی بین همه span ها
+    for t in elements:
+        t = t.replace(",", "")
+        if t.isdigit() and len(t) > 6:
+            return int(t)
 
     return None
 
