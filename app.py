@@ -22,9 +22,6 @@ def get_price():
     except:
         return None
 
-    return None
-
-
 # ---------------- UI ----------------
 HTML = """
 <!DOCTYPE html>
